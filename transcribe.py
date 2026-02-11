@@ -40,29 +40,41 @@ def wait_for_processing(file):
     return file
 
 def analyze_audio(file):
-    """Sends the prompt to Gemini."""
-    model = genai.GenerativeModel("gemini-2.0-flash") # Updated to the model that worked for you!
+    # SWITCH 1: Use the "Pro" model for better reasoning
+    # (We use 1.5-pro because it is extremely stable for audio reasoning)
+    model = genai.GenerativeModel("gemini-1.5-pro") 
     
-    prompt = """
-    You are a professional session drummer creating a 'cheat sheet'.
-    Listen to the audio and extract the song structure.
-    
-    RULES:
-    1. Ignore lyrics. Focus on drums/structure.
-    2. Identify sections (Intro, Verse, Chorus, Bridge, Solo).
-    3. Count bars (e.g., "8x", "16x").
-    4. Describe 'Feel' in 2-4 words (e.g., 'Tom Groove', 'Half-time').
-    5. Note hits/stops.
-    
-    OUTPUT JSON ONLY:
+    # SWITCH 2: The "Golden Example" (Few-Shot Prompting)
+    # This teaches the AI your specific vocabulary.
+    example_prompt = """
+    EXAMPLE OF A PERFECT CHART:
+    User Input: [Audio File]
+    AI Output: 
     [
-        {"section": "Intro", "bars": "4x", "feel": "Tom Groove", "notes": "Build"},
-        {"section": "Verse 1", "bars": "8x", "feel": "Closed HH", "notes": ""}
+        {"section": "Intro", "bars": "4x", "feel": "Snare March (Rolls)", "notes": "Crescendo last bar"},
+        {"section": "Verse 1", "bars": "8x", "feel": "Tight Hi-Hat Groove", "notes": "Rimshot on 2 & 4"},
+        {"section": "Chorus 1", "bars": "8x", "feel": "Open Washy Ride", "notes": "Driving, crash on 1"},
+        {"section": "Interlude", "bars": "2x", "feel": "Stop / Break", "notes": "Tacet (Silence)"},
+        {"section": "Bridge", "bars": "16x", "feel": "Tom Groove (Floor)", "notes": "Build with kick"}
     ]
     """
+
+    system_instruction = """
+    You are a professional session drummer creating a gig 'cheat sheet'.
+    Your goal is to listen to the audio and produce a structured road map.
     
+    CRITICAL INSTRUCTIONS:
+    1. **Listen for the '1'**: Count bars precisely. Do not guess standard 8-bar phrases if it's actually 9 or 7.
+    2. **Identify the Groove**: Use terms like "Half-time", "Double-time", "Train beat", "Four on the floor", "Syncopated".
+    3. **Notes**: Explicitly mention "Stops", "Hits", "Flams", or "No Drums".
+    4. **Structure**: Break it down by musical section (Intro, V1, C1, V2, C2, Solo, Bridge, Outro).
+    
+    Format: Return ONLY valid JSON.
+    """
+    
+    # Send the "System rules" + "Example" + "Actual Audio"
     response = model.generate_content(
-        [file, prompt],
+        [system_instruction, example_prompt, "Now analyze this track and output the JSON:", file],
         generation_config={"response_mime_type": "application/json"}
     )
     return json.loads(response.text)
