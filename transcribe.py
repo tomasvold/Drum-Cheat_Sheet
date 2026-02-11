@@ -33,25 +33,39 @@ st.markdown("""
         color: #e0e0e0;
     }
 
-    /* HEADERS (Orbitron Font) */
+    /* CENTERED HEADERS */
     h1, h2, h3 {
         font-family: 'Orbitron', sans-serif !important;
-        color: #00d2ff !important; /* IsoMix Cyan */
+        color: #00d2ff !important;
         letter-spacing: 2px;
         text-shadow: 0 0 10px rgba(0, 210, 255, 0.3);
+        text-align: center; /* <--- ADDED THIS */
     }
     
-    /* SUBTITLES */
+    /* CENTERED SUBTITLES */
     .subtitle {
         font-size: 1.1rem;
         color: #aaa;
         margin-bottom: 30px;
         line-height: 1.6;
+        text-align: center; /* <--- ADDED THIS */
     }
 
-    /* BUTTONS (Orange Accent) */
+    /* "CARD" LOOK FOR MAIN CONTENT */
+    /* This targets the main container to look like your landing page card */
+    div.block-container {
+        background-color: rgba(30, 30, 30, 0.85); /* Semi-transparent dark bg */
+        padding: 3rem;
+        border-radius: 16px;
+        border: 1px solid #333;
+        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+        max-width: 800px; /* Limits width to look like a card */
+        margin-top: 2rem;
+    }
+
+    /* BUTTONS */
     div.stButton > button {
-        background-color: #ff9900; /* IsoMix Orange */
+        background-color: #ff9900;
         color: #111;
         font-family: 'Orbitron', sans-serif;
         font-weight: 700;
@@ -71,24 +85,10 @@ st.markdown("""
         border: none;
     }
     
-    /* UPLOAD BOX */
-    .stFileUploader {
-        border: 1px dashed #444;
-        background: rgba(0,0,0,0.2);
-        border-radius: 12px;
-        padding: 20px;
-    }
-    
     /* TABLE STYLING */
     div[data-testid="stTable"] {
-        background: rgba(30, 30, 30, 0.95);
-        border-radius: 10px;
-        overflow: hidden;
+        background: transparent; /* Let container bg show through */
     }
-    
-    /* LINK COLOR */
-    a { color: #00d2ff !important; }
-
 </style>
 """, unsafe_allow_html=True)
 
@@ -104,9 +104,11 @@ with st.sidebar:
     st.markdown("Created by **Tom Åsvold**")
 
 # --- 4. HEADER UI ---
-# Display Logo if it exists
+# Centering logic for the logo using columns
 if os.path.exists("logo.png"):
-    st.image("logo.png", width=300) 
+    col1, col2, col3 = st.columns([1, 2, 1]) # Create 3 columns
+    with col2: # Put logo in the middle one
+        st.image("logo.png", use_container_width=True)
 
 st.title("ISOMIX AI Drum Charts")
 
