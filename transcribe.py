@@ -3,6 +3,12 @@ import google.generativeai as genai
 from reportlab.lib.pagesizes import LETTER
 from reportlab.pdfgen import canvas
 from reportlab.lib import colors
+from reportlab.lib.pagesizes import LETTER
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib import colors
+from reportlab.lib.units import inch
+from reportlab.lib.enums import TA_RIGHT
 import os
 import json
 import time
@@ -79,74 +85,106 @@ def analyze_audio(file):
     )
     return json.loads(response.text)
 
-from reportlab.lib.pagesizes import LETTER
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
-from reportlab.lib.styles import getSampleStyleSheet
-from reportlab.lib import colors
-from reportlab.lib.units import inch
-
 def create_pdf(structure_data, song_title):
-    """Generates a professional PDF with text wrapping and logo."""
+    """Generates a professional PDF with Side-by-Side Header."""
     buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=LETTER)
+    # Margins: 0.5 inch on sides to maximize space
+    doc = SimpleDocTemplate(buffer, pagesize=LETTER, rightMargin=36, leftMargin=36, topMargin=36, bottomMargin=36)
     story = []
     styles = getSampleStyleSheet()
 
-    # --- 1. LOGO SECTION ---
-    # If you upload a file named 'logo.png' to your folder, it will render here.
+    # --- 1. HEADER SECTION (Side-by-Side) ---
+    
+    # A. Clean up the title (Remove .mp3/.wav for the big header)
+    clean_title = song_title
+    for ext in [".mp3", ".wav", ".m4a"]:
+        clean_title = clean_title.replace(ext, "")
+        
+    # B. Define Styles
+    # Create a custom "Big Title" style
+    title_style = styles['Heading1']
+    title_style.fontSize = 24
+    title_style.leading = 28 # Line height
+    title_style.textColor = colors.black
+    
+    # Create a "Subtitle" style
+    subtitle_style = styles['Normal']
+    subtitle_style.fontSize = 12
+    subtitle_style.textColor = colors.gray
+
+    # C. Create Elements
+    # Left Side: Title + "Drum Chart" text
+    header_text = [
+        Paragraph(f"<b>{clean_title}</b>", title_style),
+        Paragraph("Drum Chart / Road Map", subtitle_style)
+    ]
+    
+    # Right Side: Logo
+    header_logo = []
     if os.path.exists("logo.png"):
-        # Adjust width/height as needed (e.g., 2*inch wide)
-        img = Image("logo.png", width=2*inch, height=0.75*inch)
-        img.hAlign = 'RIGHT' # Puts logo in top right
-        story.append(img)
-        story.append(Spacer(1, 12))
+        # Adjust these numbers to fit your specific logo shape
+        img = Image("logo.png", width=2*inch, height=0.66*inch)
+        img.hAlign = 'RIGHT'
+        header_logo.append(img)
+    
+    # D. Build the Header Table (2 Columns)
+    # Col 1 (Text) gets 60% width, Col 2 (Logo) gets 40% width
+    header_table_data = [[header_text, header_logo]]
+    
+    header_table = Table(header_table_data, colWidths=[5*inch, 2.5*inch])
+    header_table.setStyle(TableStyle([
+        ('VALIGN', (0,0), (-1,-1), 'TOP'), # Align text and logo to top
+        ('ALIGN', (0,0), (0,0), 'LEFT'),   # Title aligns Left
+        ('ALIGN', (1,0), (1,0), 'RIGHT'),  # Logo aligns Right
+        ('LEFTPADDING', (0,0), (-1,-1), 0),
+        ('RIGHTPADDING', (0,0), (-1,-1), 0),
+    ]))
+    
+    story.append(header_table)
+    story.append(Spacer(1, 30)) # Add space before the chart starts
 
-    # --- 2. HEADER ---
-    story.append(Paragraph("Drum Chart", styles['Title']))
-    story.append(Paragraph(f"<b>Track:</b> {song_title}", styles['Normal']))
-    story.append(Spacer(1, 20))
-
-    # --- 3. TABLE DATA SETUP ---
-    # We use 'Paragraph' for the Notes column so it wraps automatically
+    # --- 2. CHART DATA ---
     table_data = [['SECTION', 'BARS', 'FEEL / GROOVE', 'NOTES']]
     
     for item in structure_data:
-        # Wrap the notes text so it doesn't run off the page
-        notes_paragraph = Paragraph(f"<font color='darkred'>{item.get('notes', '')}</font>", styles['BodyText'])
+        # Style the Notes in Red
+        notes_text = f"<font color='#8B0000'>{item.get('notes', '')}</font>"
+        notes_cell = Paragraph(notes_text, styles['BodyText'])
+        
+        # Style the Feel (Standard text)
+        feel_cell = Paragraph(item.get('feel', ''), styles['BodyText'])
         
         row = [
             item.get('section', ''),
             item.get('bars', ''),
-            item.get('feel', ''),
-            notes_paragraph # This is the magic wrapper
+            feel_cell,
+            notes_cell
         ]
         table_data.append(row)
 
-    # --- 4. TABLE STYLING ---
-    # Column widths: Section(1.5"), Bars(0.75"), Feel(2.0"), Notes(3.25")
-    col_widths = [1.5*inch, 0.75*inch, 2.0*inch, 3.25*inch]
+    # --- 3. CHART STYLING ---
+    # Adjusted widths to fit the new margins (Total ~7.5 inches)
+    col_widths = [1.3*inch, 0.7*inch, 2.2*inch, 3.3*inch]
     
-    chart_table = Table(table_data, colWidths=col_widths)
+    chart_table = Table(table_data, colWidths=col_widths, repeatRows=1)
     
     chart_table.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,0), colors.lightgrey), # Header background
-        ('TEXTCOLOR', (0,0), (-1,0), colors.black),      # Header text
-        ('ALIGN', (0,0), (-1,-1), 'LEFT'),               # Left align everything
-        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),   # Header font
-        ('FONTSIZE', (0,0), (-1,0), 12),
-        ('BOTTOMPADDING', (0,0), (-1,0), 12),            # Header padding
-        ('BACKGROUND', (0,1), (-1,-1), colors.white),    # Body background
-        ('GRID', (0,0), (-1,-1), 0.5, colors.grey),      # Grid lines
-        ('VALIGN', (0,0), (-1,-1), 'TOP'),               # Align text to top of cell
-        ('LEFTPADDING', (0,0), (-1,-1), 6),
-        ('RIGHTPADDING', (0,0), (-1,-1), 6),
-        ('TOPPADDING', (0,0), (-1,-1), 6),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 6),
+        ('BACKGROUND', (0,0), (-1,0), colors.lightgrey),
+        ('TEXTCOLOR', (0,0), (-1,0), colors.black),
+        ('ALIGN', (0,0), (-1,-1), 'LEFT'),
+        ('VALIGN', (0,0), (-1,-1), 'TOP'),
+        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0,0), (-1,0), 11), # Slightly smaller header to fit more
+        ('BOTTOMPADDING', (0,0), (-1,0), 10),
+        ('GRID', (0,0), (-1,-1), 0.5, colors.grey),
+        ('LEFTPADDING', (0,0), (-1,-1), 5),
+        ('RIGHTPADDING', (0,0), (-1,-1), 5),
+        ('TOPPADDING', (0,0), (-1,-1), 8),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 8),
     ]))
 
     story.append(chart_table)
     
-    # --- BUILD PDF ---
     doc.build(story)
     buffer.seek(0)
     return buffer
