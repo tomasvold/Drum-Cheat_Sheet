@@ -218,11 +218,23 @@ def create_pdf(structure_data, song_title):
 
     # --- CHART DATA ---
     table_data = [['SECTION', 'BARS', 'FEEL / GROOVE', 'NOTES']]
+    
     for item in structure_data:
-        notes_text = f"<font color='#8B0000'>{item.get('notes', '')}</font>"
+        # --- SAFETY CHECK: PREVENT CRASH ON NEW ROWS ---
+        # When adding a row, values might be None. We force them to be strings.
+        section = str(item.get('section') or "")
+        bars = str(item.get('bars') or "")
+        feel = str(item.get('feel') or "")
+        notes = str(item.get('notes') or "")
+
+        # Style the Notes in Red
+        notes_text = f"<font color='#8B0000'>{notes}</font>"
         notes_cell = Paragraph(notes_text, styles['BodyText'])
-        feel_cell = Paragraph(item.get('feel', ''), styles['BodyText'])
-        row = [item.get('section', ''), item.get('bars', ''), feel_cell, notes_cell]
+        
+        # Style the Feel (Standard text)
+        feel_cell = Paragraph(feel, styles['BodyText'])
+        
+        row = [section, bars, feel_cell, notes_cell]
         table_data.append(row)
 
     col_widths = [1.3*inch, 0.7*inch, 2.2*inch, 3.3*inch]
