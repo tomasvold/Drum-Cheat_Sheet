@@ -1,36 +1,125 @@
 import streamlit as st
 import google.generativeai as genai
 from reportlab.lib.pagesizes import LETTER
-from reportlab.pdfgen import canvas
-from reportlab.lib import colors
-from reportlab.lib.pagesizes import LETTER
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib import colors
 from reportlab.lib.units import inch
-from reportlab.lib.enums import TA_RIGHT
 import os
 import json
 import time
 import tempfile
 from io import BytesIO
 
-# --- PAGE CONFIG ---
-st.set_page_config(page_title="AI Drum Charter", page_icon="🥁", layout="centered")
+# --- 1. CONFIGURATION ---
+st.set_page_config(
+    page_title="ISOMIX | AI Drum Charts",
+    page_icon="🥁",
+    layout="centered"
+)
 
-st.title("🥁 AI Drum Charter")
-st.write("Upload a song, get a gig-ready cheat sheet.")
+# --- 2. CUSTOM CSS (The "ISOMIX" Look) ---
+# This block is what makes your app look like your Studio site
+st.markdown("""
+<style>
+    /* IMPORT FONTS */
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Roboto:wght@300;400;700&display=swap');
 
-# --- SIDEBAR: API KEY ---
+    /* GLOBAL THEME */
+    .stApp {
+        background: radial-gradient(circle at center, #2c3e50 0%, #000 100%);
+        background-attachment: fixed;
+        font-family: 'Roboto', sans-serif;
+        color: #e0e0e0;
+    }
+
+    /* HEADERS (Orbitron Font) */
+    h1, h2, h3 {
+        font-family: 'Orbitron', sans-serif !important;
+        color: #00d2ff !important; /* IsoMix Cyan */
+        letter-spacing: 2px;
+        text-shadow: 0 0 10px rgba(0, 210, 255, 0.3);
+    }
+    
+    /* SUBTITLES */
+    .subtitle {
+        font-size: 1.1rem;
+        color: #aaa;
+        margin-bottom: 30px;
+        line-height: 1.6;
+    }
+
+    /* BUTTONS (Orange Accent) */
+    div.stButton > button {
+        background-color: #ff9900; /* IsoMix Orange */
+        color: #111;
+        font-family: 'Orbitron', sans-serif;
+        font-weight: 700;
+        text-transform: uppercase;
+        border-radius: 50px;
+        border: none;
+        padding: 12px 30px;
+        box-shadow: 0 0 15px rgba(255, 153, 0, 0.3);
+        transition: all 0.3s ease;
+        width: 100%;
+    }
+    div.stButton > button:hover {
+        background-color: #ffaa33;
+        color: #000;
+        transform: translateY(-2px);
+        box-shadow: 0 0 30px rgba(255, 153, 0, 0.6);
+        border: none;
+    }
+    
+    /* UPLOAD BOX */
+    .stFileUploader {
+        border: 1px dashed #444;
+        background: rgba(0,0,0,0.2);
+        border-radius: 12px;
+        padding: 20px;
+    }
+    
+    /* TABLE STYLING */
+    div[data-testid="stTable"] {
+        background: rgba(30, 30, 30, 0.95);
+        border-radius: 10px;
+        overflow: hidden;
+    }
+    
+    /* LINK COLOR */
+    a { color: #00d2ff !important; }
+
+</style>
+""", unsafe_allow_html=True)
+
+# --- 3. SIDEBAR ---
 with st.sidebar:
     st.header("Settings")
     api_key = st.text_input("Google API Key", type="password")
     if not api_key and "GOOGLE_API_KEY" in os.environ:
         api_key = os.environ["GOOGLE_API_KEY"]
     
-    st.info("Get your key from [Google AI Studio](https://aistudio.google.com/)")
+    st.info("Powered by **Gemini 2.5 Pro**")
+    st.markdown("---")
+    st.markdown("Created by **Tom Åsvold**")
 
-# --- FUNCTIONS ---
+# --- 4. HEADER UI ---
+# Display Logo if it exists
+if os.path.exists("logo.png"):
+    st.image("logo.png", width=300) 
+
+st.title("ISOMIX AI Drum Charts")
+
+# The "Pro" Description
+st.markdown("""
+<div class="subtitle">
+    Instantly turn any audio file into a gig-ready road map. 
+    Get bar counts, groove analysis, and performance cues in seconds.
+</div>
+""", unsafe_allow_html=True)
+
+
+# --- 5. FUNCTIONS (Logic) ---
 def upload_to_gemini(filepath, api_key):
     """Uploads file to Gemini."""
     genai.configure(api_key=api_key)
@@ -46,12 +135,9 @@ def wait_for_processing(file):
     return file
 
 def analyze_audio(file):
-    # SWITCH 1: Use the "Pro" model for better reasoning
-    # (We use 1.5-pro because it is extremely stable for audio reasoning)
+    # Use the smart model
     model = genai.GenerativeModel("gemini-2.5-pro") 
     
-    # SWITCH 2: The "Golden Example" (Few-Shot Prompting)
-    # This teaches the AI your specific vocabulary.
     example_prompt = """
     EXAMPLE OF A PERFECT CHART:
     User Input: [Audio File]
@@ -78,7 +164,6 @@ def analyze_audio(file):
     Format: Return ONLY valid JSON.
     """
     
-    # Send the "System rules" + "Example" + "Actual Audio"
     response = model.generate_content(
         [system_instruction, example_prompt, "Now analyze this track and output the JSON:", file],
         generation_config={"response_mime_type": "application/json"}
@@ -88,93 +173,65 @@ def analyze_audio(file):
 def create_pdf(structure_data, song_title):
     """Generates a professional PDF with Side-by-Side Header."""
     buffer = BytesIO()
-    # Margins: 0.5 inch on sides to maximize space
     doc = SimpleDocTemplate(buffer, pagesize=LETTER, rightMargin=36, leftMargin=36, topMargin=36, bottomMargin=36)
     story = []
     styles = getSampleStyleSheet()
 
-    # --- 1. HEADER SECTION (Side-by-Side) ---
-    
-    # A. Clean up the title (Remove .mp3/.wav for the big header)
+    # --- HEADER ---
     clean_title = song_title
     for ext in [".mp3", ".wav", ".m4a"]:
         clean_title = clean_title.replace(ext, "")
         
-    # B. Define Styles
-    # Create a custom "Big Title" style
     title_style = styles['Heading1']
     title_style.fontSize = 24
-    title_style.leading = 28 # Line height
+    title_style.leading = 28
     title_style.textColor = colors.black
     
-    # Create a "Subtitle" style
     subtitle_style = styles['Normal']
     subtitle_style.fontSize = 12
     subtitle_style.textColor = colors.gray
 
-    # C. Create Elements
-    # Left Side: Title + "Drum Chart" text
     header_text = [
         Paragraph(f"<b>{clean_title}</b>", title_style),
         Paragraph("Drum Chart / Road Map", subtitle_style)
     ]
     
-    # Right Side: Logo
     header_logo = []
     if os.path.exists("logo.png"):
-        # Adjust these numbers to fit your specific logo shape
         img = Image("logo.png", width=2*inch, height=0.66*inch)
         img.hAlign = 'RIGHT'
         header_logo.append(img)
     
-    # D. Build the Header Table (2 Columns)
-    # Col 1 (Text) gets 60% width, Col 2 (Logo) gets 40% width
     header_table_data = [[header_text, header_logo]]
-    
     header_table = Table(header_table_data, colWidths=[5*inch, 2.5*inch])
     header_table.setStyle(TableStyle([
-        ('VALIGN', (0,0), (-1,-1), 'TOP'), # Align text and logo to top
-        ('ALIGN', (0,0), (0,0), 'LEFT'),   # Title aligns Left
-        ('ALIGN', (1,0), (1,0), 'RIGHT'),  # Logo aligns Right
+        ('VALIGN', (0,0), (-1,-1), 'TOP'),
+        ('ALIGN', (0,0), (0,0), 'LEFT'),
+        ('ALIGN', (1,0), (1,0), 'RIGHT'),
         ('LEFTPADDING', (0,0), (-1,-1), 0),
         ('RIGHTPADDING', (0,0), (-1,-1), 0),
     ]))
-    
     story.append(header_table)
-    story.append(Spacer(1, 30)) # Add space before the chart starts
+    story.append(Spacer(1, 30))
 
-    # --- 2. CHART DATA ---
+    # --- CHART DATA ---
     table_data = [['SECTION', 'BARS', 'FEEL / GROOVE', 'NOTES']]
-    
     for item in structure_data:
-        # Style the Notes in Red
         notes_text = f"<font color='#8B0000'>{item.get('notes', '')}</font>"
         notes_cell = Paragraph(notes_text, styles['BodyText'])
-        
-        # Style the Feel (Standard text)
         feel_cell = Paragraph(item.get('feel', ''), styles['BodyText'])
-        
-        row = [
-            item.get('section', ''),
-            item.get('bars', ''),
-            feel_cell,
-            notes_cell
-        ]
+        row = [item.get('section', ''), item.get('bars', ''), feel_cell, notes_cell]
         table_data.append(row)
 
-    # --- 3. CHART STYLING ---
-    # Adjusted widths to fit the new margins (Total ~7.5 inches)
     col_widths = [1.3*inch, 0.7*inch, 2.2*inch, 3.3*inch]
-    
     chart_table = Table(table_data, colWidths=col_widths, repeatRows=1)
-    
     chart_table.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.lightgrey),
         ('TEXTCOLOR', (0,0), (-1,0), colors.black),
         ('ALIGN', (0,0), (-1,-1), 'LEFT'),
         ('VALIGN', (0,0), (-1,-1), 'TOP'),
         ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0,0), (-1,0), 11), # Slightly smaller header to fit more
+        ('FONTSIZE', (0,0), (-1,0), 11),
         ('BOTTOMPADDING', (0,0), (-1,0), 10),
         ('GRID', (0,0), (-1,-1), 0.5, colors.grey),
         ('LEFTPADDING', (0,0), (-1,-1), 5),
@@ -182,25 +239,25 @@ def create_pdf(structure_data, song_title):
         ('TOPPADDING', (0,0), (-1,-1), 8),
         ('BOTTOMPADDING', (0,0), (-1,-1), 8),
     ]))
-
     story.append(chart_table)
-    
     doc.build(story)
     buffer.seek(0)
     return buffer
 
-# --- MAIN UI ---
+# --- 6. MAIN UI LOGIC ---
 uploaded_file = st.file_uploader("Upload Audio (MP3/WAV)", type=["mp3", "wav", "m4a"])
 
+if "chart_data" not in st.session_state:
+    st.session_state.chart_data = None
+
 if uploaded_file and api_key:
-    if st.button("Generate Chart"):
+    # Button Style Trigger (Handled by CSS above)
+    if st.button("GENERATE CHART"):
         try:
-            # 1. Save uploaded file temporarily (Gemini needs a path)
             with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp_file:
                 tmp_file.write(uploaded_file.getvalue())
                 tmp_path = tmp_file.name
 
-            # 2. Upload & Process
             with st.status("Processing...", expanded=True) as status:
                 st.write("Uploading to Gemini...")
                 g_file = upload_to_gemini(tmp_path, api_key)
@@ -209,29 +266,43 @@ if uploaded_file and api_key:
                 g_file = wait_for_processing(g_file)
                 
                 st.write("Generating chart...")
-                structure_data = analyze_audio(g_file)
+                st.session_state.chart_data = analyze_audio(g_file)
                 
                 status.update(label="Done!", state="complete", expanded=False)
-
-            # 3. Show Preview
-            st.subheader("Chart Preview")
-            st.table(structure_data) # Shows the data nicely on the web page
             
-            # 4. Create PDF Download
-            pdf_bytes = create_pdf(structure_data, uploaded_file.name)
-            
-            st.download_button(
-                label="Download PDF Chart 📄",
-                data=pdf_bytes,
-                file_name=f"{uploaded_file.name}_chart.pdf",
-                mime="application/pdf"
-            )
-            
-            # Cleanup temp file
             os.remove(tmp_path)
 
         except Exception as e:
             st.error(f"An error occurred: {e}")
+
+    # EDITOR & DOWNLOAD
+    if st.session_state.chart_data is not None:
+        st.markdown("### Edit Your Chart")
+        
+        edited_data = st.data_editor(
+            st.session_state.chart_data,
+            column_config={
+                "section": "Section",
+                "bars": "Bars",
+                "feel": "Feel / Groove",
+                "notes": st.column_config.TextColumn("Notes", width="large")
+            },
+            num_rows="dynamic",
+            use_container_width=True 
+        )
+
+        pdf_bytes = create_pdf(edited_data, uploaded_file.name)
+        
+        st.download_button(
+            label="DOWNLOAD PDF CHART 📄",
+            data=pdf_bytes,
+            file_name=f"{uploaded_file.name.replace('.mp3', '')}_chart.pdf",
+            mime="application/pdf"
+        )
+        
+        if st.button("START OVER"):
+            st.session_state.chart_data = None
+            st.rerun()
 
 elif not api_key:
     st.warning("👈 Please enter your Google API Key in the sidebar to start.")
