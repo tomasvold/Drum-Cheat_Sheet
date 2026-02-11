@@ -42,7 +42,7 @@ def wait_for_processing(file):
 def analyze_audio(file):
     # SWITCH 1: Use the "Pro" model for better reasoning
     # (We use 1.5-pro because it is extremely stable for audio reasoning)
-    model = genai.GenerativeModel("gemini-1.5-pro") 
+    model = genai.GenerativeModel("gemini-2.5-pro") 
     
     # SWITCH 2: The "Golden Example" (Few-Shot Prompting)
     # This teaches the AI your specific vocabulary.
