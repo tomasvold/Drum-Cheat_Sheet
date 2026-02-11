@@ -79,52 +79,75 @@ def analyze_audio(file):
     )
     return json.loads(response.text)
 
+from reportlab.lib.pagesizes import LETTER
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib import colors
+from reportlab.lib.units import inch
+
 def create_pdf(structure_data, song_title):
-    """Generates PDF in memory."""
+    """Generates a professional PDF with text wrapping and logo."""
     buffer = BytesIO()
-    c = canvas.Canvas(buffer, pagesize=LETTER)
-    width, height = LETTER
-    
-    # Header
-    c.setFont("Helvetica-Bold", 24)
-    c.drawString(50, height - 50, "Drum Chart")
-    c.setFont("Helvetica", 12)
-    c.drawString(50, height - 70, f"Track: {song_title}")
-    
-    # Table Header
-    y = height - 120
-    c.setFont("Helvetica-Bold", 12)
-    c.drawString(50, y, "SECTION")
-    c.drawString(200, y, "BARS")
-    c.drawString(300, y, "FEEL / GROOVE")
-    c.drawString(450, y, "NOTES")
-    
-    y -= 10
-    c.line(50, y, width - 50, y)
-    y -= 30
-    
-    c.setFont("Helvetica", 12)
+    doc = SimpleDocTemplate(buffer, pagesize=LETTER)
+    story = []
+    styles = getSampleStyleSheet()
+
+    # --- 1. LOGO SECTION ---
+    # If you upload a file named 'logo.png' to your folder, it will render here.
+    if os.path.exists("logo.png"):
+        # Adjust width/height as needed (e.g., 2*inch wide)
+        img = Image("logo.png", width=2*inch, height=0.75*inch)
+        img.hAlign = 'RIGHT' # Puts logo in top right
+        story.append(img)
+        story.append(Spacer(1, 12))
+
+    # --- 2. HEADER ---
+    story.append(Paragraph("Drum Chart", styles['Title']))
+    story.append(Paragraph(f"<b>Track:</b> {song_title}", styles['Normal']))
+    story.append(Spacer(1, 20))
+
+    # --- 3. TABLE DATA SETUP ---
+    # We use 'Paragraph' for the Notes column so it wraps automatically
+    table_data = [['SECTION', 'BARS', 'FEEL / GROOVE', 'NOTES']]
     
     for item in structure_data:
-        if y < 50:
-            c.showPage()
-            y = height - 50
+        # Wrap the notes text so it doesn't run off the page
+        notes_paragraph = Paragraph(f"<font color='darkred'>{item.get('notes', '')}</font>", styles['BodyText'])
         
-        c.drawString(50, y, item.get('section', ''))
-        c.drawString(200, y, str(item.get('bars', '')))
-        c.drawString(300, y, item.get('feel', ''))
-        
-        c.setFillColor(colors.darkred)
-        c.drawString(450, y, item.get('notes', ''))
-        c.setFillColor(colors.black)
-        
-        y -= 15
-        c.setStrokeColor(colors.lightgrey)
-        c.line(50, y, width - 50, y)
-        c.setStrokeColor(colors.black)
-        y -= 25
-        
-    c.save()
+        row = [
+            item.get('section', ''),
+            item.get('bars', ''),
+            item.get('feel', ''),
+            notes_paragraph # This is the magic wrapper
+        ]
+        table_data.append(row)
+
+    # --- 4. TABLE STYLING ---
+    # Column widths: Section(1.5"), Bars(0.75"), Feel(2.0"), Notes(3.25")
+    col_widths = [1.5*inch, 0.75*inch, 2.0*inch, 3.25*inch]
+    
+    chart_table = Table(table_data, colWidths=col_widths)
+    
+    chart_table.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), colors.lightgrey), # Header background
+        ('TEXTCOLOR', (0,0), (-1,0), colors.black),      # Header text
+        ('ALIGN', (0,0), (-1,-1), 'LEFT'),               # Left align everything
+        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),   # Header font
+        ('FONTSIZE', (0,0), (-1,0), 12),
+        ('BOTTOMPADDING', (0,0), (-1,0), 12),            # Header padding
+        ('BACKGROUND', (0,1), (-1,-1), colors.white),    # Body background
+        ('GRID', (0,0), (-1,-1), 0.5, colors.grey),      # Grid lines
+        ('VALIGN', (0,0), (-1,-1), 'TOP'),               # Align text to top of cell
+        ('LEFTPADDING', (0,0), (-1,-1), 6),
+        ('RIGHTPADDING', (0,0), (-1,-1), 6),
+        ('TOPPADDING', (0,0), (-1,-1), 6),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 6),
+    ]))
+
+    story.append(chart_table)
+    
+    # --- BUILD PDF ---
+    doc.build(story)
     buffer.seek(0)
     return buffer
 
