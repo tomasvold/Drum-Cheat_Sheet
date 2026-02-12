@@ -119,7 +119,7 @@ with st.sidebar:
         col1, col2 = st.columns(2)
         
         with col1:
-            if st.button("➕ INSERT", use_container_width=True):
+            if st.button("➕ INSERT", width="auto"):
                 import pandas as pd
                 # Safety: Use .get() here too
                 df = pd.DataFrame(st.session_state.get("chart_data", []))
@@ -131,7 +131,7 @@ with st.sidebar:
                 st.rerun()
 
         with col2:
-            if st.button("🗑️ DELETE", use_container_width=True):
+            if st.button("🗑️ DELETE", width="auto"):
                 import pandas as pd
                 # Safety: Use .get() here too
                 df = pd.DataFrame(st.session_state.get("chart_data", []))
@@ -149,7 +149,7 @@ with st.sidebar:
 if os.path.exists("logo.png"):
     col1, col2, col3 = st.columns([1, 2, 1]) # Create 3 columns
     with col2: # Put logo in the middle one
-        st.image("logo.png", use_container_width=True)
+        st.image("logo.png", width="container")
 
 st.title("ISOMIX AI Drum Charts")
 
@@ -394,7 +394,7 @@ if final_audio_source and api_key:
                 "notes": st.column_config.TextColumn("Notes", width="large")
             },
             num_rows="dynamic",
-            use_container_width=True 
+            width="auto"
         )
 
         pdf_bytes = create_pdf(edited_data, song_display_name)
