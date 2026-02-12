@@ -259,40 +259,70 @@ def create_pdf(structure_data, song_title):
     return buffer
 
 # --- 6. MAIN UI LOGIC ---
-uploaded_file = st.file_uploader("Upload Audio (MP3/WAV)", type=["mp3", "wav", "m4a"])
+# Create tabs for the two input methods
+tab1, tab2 = st.tabs(["📁 Upload File", "🎥 YouTube URL"])
 
+# Variables to hold our common data
+final_audio_source = None
+song_display_name = ""
+
+with tab1:
+    uploaded_file = st.file_uploader("Upload Audio (MP3/WAV)", type=["mp3", "wav", "m4a"])
+    if uploaded_file:
+        final_audio_source = uploaded_file
+        song_display_name = uploaded_file.name
+
+with tab2:
+    yt_url = st.text_input("Paste Public YouTube URL", placeholder="https://www.youtube.com/watch?v=...")
+    if yt_url:
+        final_audio_source = yt_url
+        # Ask for a title since we don't have a filename
+        song_display_name = st.text_input("Enter Song Title (for PDF)", value="YouTube Track")
+
+# Initialize session state
 if "chart_data" not in st.session_state:
     st.session_state.chart_data = None
 
-if uploaded_file and api_key:
-    # Button Style Trigger (Handled by CSS above)
+if final_audio_source and api_key:
     if st.button("GENERATE CHART"):
         try:
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp_file:
-                tmp_file.write(uploaded_file.getvalue())
-                tmp_path = tmp_file.name
-
             with st.status("Processing...", expanded=True) as status:
-                st.write("Uploading to Gemini...")
-                g_file = upload_to_gemini(tmp_path, api_key)
-                
-                st.write("Listening & counting bars...")
-                g_file = wait_for_processing(g_file)
-                
-                st.write("Generating chart...")
-                st.session_state.chart_data = analyze_audio(g_file)
-                
+                # BRANCH 1: User uploaded a file
+                if isinstance(final_audio_source, st.runtime.uploaded_file_manager.UploadedFile):
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp_file:
+                        tmp_file.write(final_audio_source.getvalue())
+                        tmp_path = tmp_file.name
+                    
+                    st.write("Uploading file to Gemini...")
+                    g_file = upload_to_gemini(tmp_path, api_key)
+                    g_file = wait_for_processing(g_file)
+                    
+                    st.write("Generating chart from file...")
+                    st.session_state.chart_data = analyze_audio(g_file)
+                    os.remove(tmp_path)
+
+                # BRANCH 2: User provided a YouTube URL
+                else:
+                    st.write("Gemini is accessing YouTube track...")
+                    # We pass the URL directly to the model
+                    model = genai.GenerativeModel("gemini-2.5-pro")
+                    
+                    # Create the part for the URL
+                    yt_part = {"file_data": {"file_uri": final_audio_source, "mime_type": "video/mp4"}}
+                    
+                    # Use the same prompt logic
+                    # We reuse the system_instruction and example_prompt from your functions
+                    # But for simplicity here, we'll just call a slightly modified function
+                    st.session_state.chart_data = analyze_audio(yt_part)
+
                 status.update(label="Done!", state="complete", expanded=False)
-            
-            os.remove(tmp_path)
 
         except Exception as e:
             st.error(f"An error occurred: {e}")
 
-    # EDITOR & DOWNLOAD
+    # --- EDITOR & DOWNLOAD (Same as before) ---
     if st.session_state.chart_data is not None:
         st.markdown("### Edit Your Chart")
-        
         edited_data = st.data_editor(
             st.session_state.chart_data,
             column_config={
@@ -305,12 +335,12 @@ if uploaded_file and api_key:
             use_container_width=True 
         )
 
-        pdf_bytes = create_pdf(edited_data, uploaded_file.name)
+        pdf_bytes = create_pdf(edited_data, song_display_name)
         
         st.download_button(
             label="DOWNLOAD PDF CHART 📄",
             data=pdf_bytes,
-            file_name=f"{uploaded_file.name.replace('.mp3', '')}_chart.pdf",
+            file_name=f"{song_display_name.split('.')[0]}_chart.pdf",
             mime="application/pdf"
         )
         
