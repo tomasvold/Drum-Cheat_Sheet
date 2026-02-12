@@ -149,7 +149,7 @@ with st.sidebar:
 if os.path.exists("logo.png"):
     col1, col2, col3 = st.columns([1, 2, 1]) # Create 3 columns
     with col2: # Put logo in the middle one
-        st.image("logo.png", use_container_width=True)
+        st.image("logo.png", width="stretch")
 
 st.title("ISOMIX AI Drum Charts")
 
