@@ -110,7 +110,6 @@ with st.sidebar:
     
     # --- CHART EDITING TOOLS ---
     # Only show these if a chart has actually been generated
-    # Line 109 (Inside your Sidebar block)
     if st.session_state.get("chart_data") is not None:
         st.subheader("Chart Tweaks")
         
@@ -122,7 +121,8 @@ with st.sidebar:
         with col1:
             if st.button("➕ INSERT", use_container_width=True):
                 import pandas as pd
-                df = pd.DataFrame(st.session_state.chart_data)
+                # Safety: Use .get() here too
+                df = pd.DataFrame(st.session_state.get("chart_data", []))
                 new_row = pd.DataFrame([{"section": "NEW", "bars": "1x", "feel": "", "notes": ""}])
                 
                 # Split and Insert Logic
@@ -133,7 +133,8 @@ with st.sidebar:
         with col2:
             if st.button("🗑️ DELETE", use_container_width=True):
                 import pandas as pd
-                df = pd.DataFrame(st.session_state.chart_data)
+                # Safety: Use .get() here too
+                df = pd.DataFrame(st.session_state.get("chart_data", []))
                 if not df.empty:
                     # Remove the row and reset index
                     updated_df = df.drop(df.index[target_pos]).reset_index(drop=True)
