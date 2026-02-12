@@ -111,10 +111,10 @@ with st.sidebar:
     # --- CHART EDITING TOOLS ---
     # Only show these if a chart has actually been generated
     # Line 109 (Inside your Sidebar block)
-    if st.session_state.chart_data is not None:
+    if st.session_state.get("chart_data") is not None:
         st.subheader("Chart Tweaks")
         
-        current_len = len(st.session_state.chart_data)
+        current_len = len(st.session_state.get("chart_data", []))
         target_pos = st.number_input("Target Index:", min_value=0, max_value=max(0, current_len), value=0, help="0 is the top of the chart.")
 
         col1, col2 = st.columns(2)
@@ -382,7 +382,7 @@ if final_audio_source and api_key:
             st.error(f"An error occurred: {e}")
 
     # --- EDITOR & DOWNLOAD (Same as before) ---
-    if st.session_state.chart_data is not None:
+    if st.session_state.get("chart_data") is not None:
         st.markdown("### Edit Your Chart")
         edited_data = st.data_editor(
             st.session_state.chart_data,
