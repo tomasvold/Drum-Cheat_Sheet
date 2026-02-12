@@ -119,24 +119,22 @@ with st.sidebar:
         col1, col2 = st.columns(2)
         
         with col1:
-            if st.button("➕ INSERT", width="auto"):
+            # FIX: width="auto" causes a TypeError on buttons
+            if st.button("➕ INSERT", use_container_width=True):
                 import pandas as pd
-                # Safety: Use .get() here too
                 df = pd.DataFrame(st.session_state.get("chart_data", []))
                 new_row = pd.DataFrame([{"section": "NEW", "bars": "1x", "feel": "", "notes": ""}])
                 
-                # Split and Insert Logic
                 updated_df = pd.concat([df.iloc[:target_pos], new_row, df.iloc[target_pos:]]).reset_index(drop=True)
                 st.session_state.chart_data = updated_df.to_dict('records')
                 st.rerun()
 
         with col2:
-            if st.button("🗑️ DELETE", width="auto"):
+            # FIX: width="auto" causes a TypeError on buttons
+            if st.button("🗑️ DELETE", use_container_width=True):
                 import pandas as pd
-                # Safety: Use .get() here too
                 df = pd.DataFrame(st.session_state.get("chart_data", []))
                 if not df.empty:
-                    # Remove the row and reset index
                     updated_df = df.drop(df.index[target_pos]).reset_index(drop=True)
                     st.session_state.chart_data = updated_df.to_dict('records')
                     st.rerun()
@@ -382,9 +380,11 @@ if final_audio_source and api_key:
         except Exception as e:
             st.error(f"An error occurred: {e}")
 
-    # --- EDITOR & DOWNLOAD (Same as before) ---
+    # --- EDITOR & DOWNLOAD ---
     if st.session_state.get("chart_data") is not None:
         st.markdown("### Edit Your Chart")
+        
+        # FIX: st.data_editor does not accept "auto" for width (must be int or None)
         edited_data = st.data_editor(
             st.session_state.chart_data,
             column_config={
@@ -394,7 +394,7 @@ if final_audio_source and api_key:
                 "notes": st.column_config.TextColumn("Notes", width="large")
             },
             num_rows="dynamic",
-            width="auto"
+            use_container_width=True 
         )
 
         pdf_bytes = create_pdf(edited_data, song_display_name)
@@ -403,10 +403,12 @@ if final_audio_source and api_key:
             label="DOWNLOAD PDF CHART 📄",
             data=pdf_bytes,
             file_name=f"{song_display_name.split('.')[0]}_chart.pdf",
-            mime="application/pdf"
+            mime="application/pdf",
+            use_container_width=True
         )
         
-        if st.button("START OVER"):
+        # FIX: width="auto" causes a TypeError
+        if st.button("START OVER", use_container_width=True):
             st.session_state.chart_data = None
             st.rerun()
 
