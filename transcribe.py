@@ -18,6 +18,10 @@ st.set_page_config(
     layout="centered"
 )
 
+# Initialize session state (This must come AFTER set_page_config)
+if "chart_data" not in st.session_state:
+    st.session_state.chart_data = None
+
 # --- 2. CUSTOM CSS (The "ISOMIX" Look) ---
 # This block is what makes your app look like your Studio site
 st.markdown("""
@@ -106,7 +110,8 @@ with st.sidebar:
     
     # --- CHART EDITING TOOLS ---
     # Only show these if a chart has actually been generated
-    if st.session_state.chart_data:
+    # Line 109 (Inside your Sidebar block)
+    if st.session_state.chart_data is not None:
         st.subheader("Chart Tweaks")
         
         current_len = len(st.session_state.chart_data)
