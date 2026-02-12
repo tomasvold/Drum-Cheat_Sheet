@@ -96,10 +96,45 @@ st.markdown("""
 with st.sidebar:
     st.header("Settings")
     api_key = st.text_input("Google API Key", type="password")
+    
+    # Existing Planday/Personal Info
     if not api_key and "GOOGLE_API_KEY" in os.environ:
         api_key = os.environ["GOOGLE_API_KEY"]
     
     st.info("Powered by **Gemini 2.5 Pro**")
+    st.markdown("---")
+    
+    # --- CHART EDITING TOOLS ---
+    # Only show these if a chart has actually been generated
+    if st.session_state.chart_data:
+        st.subheader("Chart Tweaks")
+        
+        current_len = len(st.session_state.chart_data)
+        target_pos = st.number_input("Target Index:", min_value=0, max_value=max(0, current_len), value=0, help="0 is the top of the chart.")
+
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            if st.button("➕ INSERT", use_container_width=True):
+                import pandas as pd
+                df = pd.DataFrame(st.session_state.chart_data)
+                new_row = pd.DataFrame([{"section": "NEW", "bars": "1x", "feel": "", "notes": ""}])
+                
+                # Split and Insert Logic
+                updated_df = pd.concat([df.iloc[:target_pos], new_row, df.iloc[target_pos:]]).reset_index(drop=True)
+                st.session_state.chart_data = updated_df.to_dict('records')
+                st.rerun()
+
+        with col2:
+            if st.button("🗑️ DELETE", use_container_width=True):
+                import pandas as pd
+                df = pd.DataFrame(st.session_state.chart_data)
+                if not df.empty:
+                    # Remove the row and reset index
+                    updated_df = df.drop(df.index[target_pos]).reset_index(drop=True)
+                    st.session_state.chart_data = updated_df.to_dict('records')
+                    st.rerun()
+
     st.markdown("---")
     st.markdown("Created by **Tom Åsvold**")
 
@@ -137,39 +172,60 @@ def wait_for_processing(file):
     return file
 
 def analyze_audio(file):
-    # Use the smart model
+    """
+    Analyzes audio/video using Gemini 2.5 Pro with a professional session-drummer persona.
+    Supports both uploaded files and YouTube URLs.
+    """
     model = genai.GenerativeModel("gemini-2.5-pro") 
     
     example_prompt = """
-    EXAMPLE OF A PERFECT CHART:
-    User Input: [Audio File]
+    EXAMPLE OF A PROFESSIONAL SESSION CHART:
+    User Input: [Audio/Video Track]
     AI Output: 
     [
-        {"section": "Intro", "bars": "4x", "feel": "Snare March (Rolls)", "notes": "Crescendo last bar"},
-        {"section": "Verse 1", "bars": "8x", "feel": "Tight Hi-Hat Groove", "notes": "Rimshot on 2 & 4"},
-        {"section": "Chorus 1", "bars": "8x", "feel": "Open Washy Ride", "notes": "Driving, crash on 1"},
-        {"section": "Interlude", "bars": "2x", "feel": "Stop / Break", "notes": "Tacet (Silence)"},
-        {"section": "Bridge", "bars": "16x", "feel": "Tom Groove (Floor)", "notes": "Build with kick"}
+        {"section": "Intro", "bars": "4", "feel": "Half-time Washy", "notes": "Crescendo on Snare rolls; Crash on 1 of bar 4"},
+        {"section": "Verse 1", "bars": "8", "feel": "Straight 4/4 Kick/Snare", "notes": "Tight Hi-Hats; Cross-stick on 4"},
+        {"section": "Chorus 1", "bars": "8", "feel": "Open Groove", "notes": "Ride Bell on quarter notes; Heavy Crashes on 1 and 3"},
+        {"section": "Interlude", "bars": "2", "feel": "Drum Fill / Stop", "notes": "Snare to Floor Tom triplet fill; Stop on 4 of bar 2"},
+        {"section": "Bridge", "bars": "16", "feel": "Tom Groove", "notes": "Tribal 16th note pattern on Floor Tom; Build intensity"},
+        {"section": "Outro", "bars": "4", "feel": "Ritardando (Slow Down)", "notes": "Big rock finish; End on sustain cymbal"}
     ]
     """
 
     system_instruction = """
-    You are a professional session drummer creating a gig 'cheat sheet'.
-    Your goal is to listen to the audio and produce a structured road map.
-    
+    ROLE: You are an elite Session Drummer and Transcription Expert.
+    TASK: Analyze the provided audio (or video) and produce a structured 'Road Map' JSON.
+
     CRITICAL INSTRUCTIONS:
-    1. **Listen for the '1'**: Count bars precisely. Do not guess standard 8-bar phrases if it's actually 9 or 7.
-    2. **Identify the Groove**: Use terms like "Half-time", "Double-time", "Train beat", "Four on the floor", "Syncopated".
-    3. **Notes**: Explicitly mention "Stops", "Hits", "Flams", or "No Drums".
-    4. **Structure**: Break it down by musical section (Intro, V1, C1, V2, C2, Solo, Bridge, Outro).
-    
-    Format: Return ONLY valid JSON.
+    1. **Tempo & Meter**: Identify the BPM and Time Signature (e.g., 4/4, 6/8, 12/8). Detect any changes.
+    2. **Precise Bar Counting**: Count EVERY bar. Do not assume standard phrases. Identify 7-bar verses or 2-bar turnarounds precisely.
+    3. **Groove Orchestration**: Use technical terms: 'Purdie Shuffle', 'Linear pattern', 'Ghost notes', 'Blast beat', 'Four-on-the-floor', 'Ride Bell groove'.
+    4. **Kit-Specific Notes**: Explicitly mention 'Rimshots', 'China/Stack hits', 'Double-kick work', and 'Dynamics' (p, mf, f, ff).
+    5. **Performance Cues**: Detail 'Stops', 'Unison band hits', and 'Diamond' (sustained) notes.
+
+    CONSTRAINTS:
+    - Output ONLY valid JSON.
+    - Bars must be strings containing just the number (e.g., "8" not "8x").
+    - Use 'Section' names like: Intro, Verse 1, Pre-Chorus, Chorus, Bridge, Solo, Outro.
     """
     
+    # We combine the prompt into a single list for the model
+    prompt_content = [
+        system_instruction, 
+        "Use this as your quality standard:", 
+        example_prompt, 
+        "Now, analyze this specific track and provide the JSON road map:", 
+        file
+    ]
+    
     response = model.generate_content(
-        [system_instruction, example_prompt, "Now analyze this track and output the JSON:", file],
-        generation_config={"response_mime_type": "application/json"}
+        prompt_content,
+        generation_config={
+            "response_mime_type": "application/json",
+            "temperature": 0.2 # Lower temperature for higher transcription accuracy
+        }
     )
+    
     return json.loads(response.text)
 
 def create_pdf(structure_data, song_title):
