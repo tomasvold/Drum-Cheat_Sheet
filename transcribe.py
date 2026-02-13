@@ -105,7 +105,7 @@ with st.sidebar:
     if not api_key and "GOOGLE_API_KEY" in os.environ:
         api_key = os.environ["GOOGLE_API_KEY"]
     
-    st.info("Powered by **Gemini 2.5 Pro**")
+    st.info("Powered by **Gemini 1.5 Pro**")
     st.markdown("---")
     
     # --- CHART EDITING TOOLS ---
@@ -180,7 +180,7 @@ def analyze_audio(file):
     Analyzes audio/video using Gemini 2.5 Pro with a professional session-drummer persona.
     Supports both uploaded files and YouTube URLs.
     """
-    model = genai.GenerativeModel("gemini-2.5-pro") 
+    model = genai.GenerativeModel("gemini-1.5-pro") 
     
     example_prompt = """
     EXAMPLE OF A PROFESSIONAL SESSION CHART:
