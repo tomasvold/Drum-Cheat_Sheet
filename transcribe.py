@@ -177,7 +177,7 @@ def wait_for_processing(file):
 
 def analyze_audio(file):
     """
-    Analyzes audio/video using Gemini 2.5 Pro with a professional session-drummer persona.
+    Analyzes audio/video using Gemini 1.5 Pro with a professional session-drummer persona.
     Supports both uploaded files and YouTube URLs.
     """
     model = genai.GenerativeModel("gemini-1.5-pro") 
@@ -345,6 +345,8 @@ if "chart_data" not in st.session_state:
 
 if final_audio_source and api_key:
     if st.button("GENERATE CHART"):
+        genai.configure(api_key=api_key)
+        
         try:
             with st.status("Processing...", expanded=True) as status:
                 # BRANCH 1: User uploaded a file
