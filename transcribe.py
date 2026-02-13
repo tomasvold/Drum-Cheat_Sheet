@@ -180,7 +180,7 @@ def analyze_audio(file):
     Analyzes audio/video using Gemini 3 Pro with a professional session-drummer persona.
     Supports both uploaded files and YouTube URLs.
     """
-    model = genai.GenerativeModel("gemini--pro") 
+    model = genai.GenerativeModel("gemini-3-pro-preview") 
     
     example_prompt = """
     EXAMPLE OF A PROFESSIONAL SESSION CHART:
