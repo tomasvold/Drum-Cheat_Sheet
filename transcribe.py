@@ -105,7 +105,7 @@ with st.sidebar:
     if not api_key and "GOOGLE_API_KEY" in os.environ:
         api_key = os.environ["GOOGLE_API_KEY"]
     
-    st.info("Powered by **Gemini 1.5 Pro**")
+    st.info("Powered by **Gemini 3.0 Pro**")
     st.markdown("---")
     
     # --- CHART EDITING TOOLS ---
@@ -177,10 +177,10 @@ def wait_for_processing(file):
 
 def analyze_audio(file):
     """
-    Analyzes audio/video using Gemini 1.5 Pro with a professional session-drummer persona.
+    Analyzes audio/video using Gemini 3 Pro with a professional session-drummer persona.
     Supports both uploaded files and YouTube URLs.
     """
-    model = genai.GenerativeModel("gemini-1.5-pro") 
+    model = genai.GenerativeModel("gemini--pro") 
     
     example_prompt = """
     EXAMPLE OF A PROFESSIONAL SESSION CHART:
@@ -367,7 +367,7 @@ if final_audio_source and api_key:
                 else:
                     st.write("Gemini is accessing YouTube track...")
                     # We pass the URL directly to the model
-                    model = genai.GenerativeModel("gemini-2.5-pro")
+                    model = genai.GenerativeModel("gemini-3-pro-preview")
                     
                     # Create the part for the URL
                     yt_part = {"file_data": {"file_uri": final_audio_source, "mime_type": "video/mp4"}}
